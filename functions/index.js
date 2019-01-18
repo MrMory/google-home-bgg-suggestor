@@ -21,14 +21,40 @@ const {
 } = require('actions-on-google');
 const functions = require('firebase-functions');
 const fetch = require('isomorphic-fetch');
+const xmlreader = require('xmlreader');
 
-const URL = 'https://raw.githubusercontent.com/actions-on-google/dialogflow-quotes-nodejs/master/quotes.json';
+const URL = 'https://www.boardgamegeek.com/xmlapi2/';
 const BACKGROUND_IMAGE = 'https://lh3.googleusercontent.com/t53m5nzjMl2B_9Qhwc81tuwyA2dBEc7WqKPlzZJ9syPUkt9VR8lu4Kq8heMjJevW3GVv9ekRWntyqXIBKEhc5i7v-SRrTan_=s688';
 
 const app = dialogflow({debug: true});
 
-// Retrieve data from the external API.
 app.intent('Default Welcome Intent', (conv) => {
+  conv.ask('What can I help you with?');
+});
+
+app.intent('Board Game Info', (conv, {boardgamename}) => {
+  const APIcall = URL + 'search?type=boardgame&exact=1&query=' + boardgamename;
+  return fetch(APIcall)
+    .then((response) => {
+      if (response.status === 200) {
+        return response.text();
+      } else {
+        conv.close(`We were unaible to find any data`);
+      }
+    })
+    .then((response) => {
+      console.log('What about this response:', response);
+      xmlreader.read(response, function(err, res) {
+        if (err) return console.log('XML read error:', err);
+        const yearpublished = res.items.item.yearpublished.attributes('value');
+        console.log('XML response updated', res.items.item.yearpublished.value);
+        conv.close(`${boardgamename} was published in ${yearpublished.value}`);
+      });
+    });
+});
+
+// Retrieve data from the external API.
+app.intent('Orignal Server Call', (conv, {boardgamename}) => {
   // Note: Moving this fetch call outside of the app intent callback will
   // cause it to become a global var (i.e. it's value will be cached across
   // function executions).
